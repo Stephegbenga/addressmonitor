@@ -51,7 +51,7 @@ function getbalance(address, network) {
 }
 
 // Get Balance for USDT
-async function getBalance(address) {
+async function getBalance(address, id, balance) {
   try {
     // contract addresss
     // https://tronscan.org/#/contract/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
@@ -63,9 +63,15 @@ async function getBalance(address) {
 
     // wallet address
     const result = await contract.balanceOf(address).call();
-
+    
     // console.log('The TRC20 balance is:', Number(result) / Math.pow(10, 6));
     console.log(Number(result))
+    if(result != 0){
+      alertme(result.weeyz_address, "USDT", result.last_balance, response)
+      update(id, amount)
+    }else{
+      update(id, amount)
+    }
   } catch (error) {
     console.log(error.message)
   }
@@ -89,12 +95,18 @@ function alertme(address, network, last_balance, balance) {
 app.get("/", (req, res) => {
   res.send("Blockchain Api");
 });
-
+// UPDATE public.crypto_purchases SET balance = '20'::integer WHERE id = '1';
+function update(id, amount){
+  pool.query(`UPDATE public.crypto_purchases SET balance = '${id}'::integer WHERE id = '${amount}'`, (error, response) => {
+    console.log(error)
+    console.log(response)
+  })
+}
 
 
 app.get("/monitor", async (req, res) => {
   res.send("Working on it")
-  pool.query("SELECT weeyz_address, balance, last_balance, payment_currency FROM crypto_purchases  WHERE (status = 0) ORDER BY id ASC", (error, response) => {
+  pool.query("SELECT id, weeyz_address, balance, payment_currency FROM public.crypto_purchases  WHERE (status = 0) ORDER BY id ASC", (error, response) => {
     console.log(response.rows)
     if (error) {
       console.log(error.message)
@@ -110,12 +122,13 @@ app.get("/monitor", async (req, res) => {
       if (result.payment_currency == 2) {
         // Get The Balance For Eth
         console.log("For Eth")
-        getbalance(address, "rinkeby").then(response => {
+        getbalance(address, "rinkeby").then(amount => {
 
-          console.log(`${response} This is the balance `)
-
-          if (response != result.last_balance) {
-            alertme(result.weeyz_address, "ETH", result.last_balance, response)
+          if(result != 0){
+            alertme(result.weeyz_address, "ETH", response)
+            update(id, amount)
+          }else{
+            update(id, amount)
           }
         }).catch((err) => {
           console.log(err.message)
@@ -123,12 +136,13 @@ app.get("/monitor", async (req, res) => {
         // If Network is BSC DO THIS
       } else if (result.payment_currenct == 3) {
         // Get The Balance for BSC
-        getbalance(result.weeyz_address, "bsc testnet").then(response => {
+        getbalance(result.weeyz_address, "bsc testnet").then(amount => {
 
-          console.log(response)
-
-          if (response != result.last_balance) {
-            alertme(result.weeyz_address, "BSC", result.last_balance, response)
+          if(result != 0){
+            alertme(result.weeyz_address, "BSC", amount)
+            update(id, amount)
+          }else{
+            update(id, amount)
           }
 
         }).catch((err) => {
@@ -137,7 +151,7 @@ app.get("/monitor", async (req, res) => {
         //  If  Network is USDT DO THIS
       } else if (result.payment_currency == 4) {
         // Get Balance for USDT
-        getBalance(address);
+        getBalance(address, id);
       }
 
     }
