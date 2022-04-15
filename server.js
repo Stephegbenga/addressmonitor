@@ -51,7 +51,7 @@ function getbalance(address, network) {
 }
 
 // Get Balance for USDT
-async function getBalance(address, id, balance) {
+async function getBalance(address, id, amount) {
   try {
     // contract addresss
     // https://tronscan.org/#/contract/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
@@ -82,9 +82,34 @@ async function getBalance(address, id, balance) {
 
 
 // Notification Function Here
-function alertme(address, network, last_balance, balance) {
-  console.log(`There is a new transactions\n\nWallet Address:${address}\nNetwork: ${network}\nLast Balance: ${last_balance}\nNew Balance: ${balance}`)
-}
+function alertme(address, network, balance) {
+  console.log(`There is a new transactions\n\nWallet Address:${address}\nNetwork: ${network}\nBalance: ${balance}`)
+  payload = {
+    address: address,
+    network: network,
+    balance: balance
+  }
+
+var data = JSON.stringify(payload);
+console.log(data)
+var config = {
+  method: 'post',
+  url: 'https://staging.api.weeyz.com/api/v1/crypto_alert',
+  headers: { 
+    'Content-Type': 'application/json'
+  },
+  data : data
+};
+
+axios(config)
+.then(function (response) {
+  console.log(JSON.stringify(response.data));
+})
+.catch(function (error) {
+  console.log(error);
+});
+
+} 
 
 
 
@@ -114,6 +139,7 @@ app.get("/monitor", async (req, res) => {
     results = response.rows
     for (const result of results) {
       address = result.weeyz_address
+      id = result.id
       // console.log(address)
       if (result.weeyz_address == null) {
         console.log("address is empty")
@@ -125,7 +151,7 @@ app.get("/monitor", async (req, res) => {
         getbalance(address, "rinkeby").then(amount => {
 
           if(result != 0){
-            alertme(result.weeyz_address, "ETH", response)
+            alertme(result.weeyz_address, "ETH", amount)
             update(id, amount)
           }else{
             update(id, amount)
