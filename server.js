@@ -122,9 +122,10 @@ app.get("/", (req, res) => {
 });
 // UPDATE public.crypto_purchases SET balance = '20'::integer WHERE id = '1';
 function update(id, amount){
-  pool.query(`UPDATE public.crypto_purchases SET balance = '${id}'::integer WHERE id = '${amount}'`, (error, response) => {
-    console.log(error)
+  pool.query(`UPDATE public.crypto_purchases SET balance = '${id}'::integer WHERE id = '${amount}'`, (response) => {
     console.log(response)
+  }).catch((error)=>{
+    console.log(error.message)
   })
 }
 
@@ -148,7 +149,7 @@ app.get("/monitor", async (req, res) => {
       if (result.payment_currency == 2) {
         // Get The Balance For Eth
         console.log("For Eth")
-        getbalance(address, "rinkeby").then(amount => {
+        getbalance(address, "eth").then(amount => {
 
           if(result != 0){
             alertme(result.weeyz_address, "ETH", amount)
