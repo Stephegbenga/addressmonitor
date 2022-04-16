@@ -36,7 +36,7 @@ const pool = new Pool({
 
 // Main Function to Get BNB and ETH Balance Using The Moralis Api Key
 function getbalance(address, network) {
-  console.log(address, network)
+  // console.log(address, network)
   var config = {
     method: 'get',
     url: `https://deep-index.moralis.io/api/v2/${address}/balance?chain=${network}`,
@@ -46,12 +46,12 @@ function getbalance(address, network) {
     }
   };
   const promise = axios(config)
-  const dataPromise = promise.then((response) => response.data.balance)
+  const dataPromise = promise.then((response) => response.data)
   return dataPromise
 }
 
 // Get Balance for USDT
-async function getBalance(address, id, amount) {
+async function getBalance(address, id) {
   try {
     // contract addresss
     // https://tronscan.org/#/contract/TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
@@ -63,13 +63,14 @@ async function getBalance(address, id, amount) {
 
     // wallet address
     const result = await contract.balanceOf(address).call();
-    
+
     // console.log('The TRC20 balance is:', Number(result) / Math.pow(10, 6));
     console.log(Number(result))
-    if(result != 0){
+    amount = Number(result)/ Math.pow(10, 6)
+    if (result != 0) {
       alertme(result.weeyz_address, "USDT", result.last_balance, response)
       update(id, amount)
-    }else{
+    } else {
       update(id, amount)
     }
   } catch (error) {
@@ -82,7 +83,8 @@ async function getBalance(address, id, amount) {
 
 
 // Notification Function Here
-function alertme(address, network, balance) {
+function alertme(id, address, network, balance) {
+  update(id, balance)
   console.log(`There is a new transactions\n\nWallet Address:${address}\nNetwork: ${network}\nBalance: ${balance}`)
   payload = {
     address: address,
@@ -90,26 +92,26 @@ function alertme(address, network, balance) {
     balance: balance
   }
 
-var data = JSON.stringify(payload);
-console.log(data)
-var config = {
-  method: 'post',
-  url: 'https://staging.api.weeyz.com/api/v1/crypto_alert',
-  headers: { 
-    'Content-Type': 'application/json'
-  },
-  data : data
-};
+  var data = JSON.stringify(payload);
+  console.log(data)
+  var config = {
+    method: 'post',
+    url: 'https://staging.api.weeyz.com/api/v1/crypto_alert',
+    headers: { 
+      'Content-Type': 'application/json'
+    },
+    data : data
+  };
 
-axios(config)
-.then(function (response) {
-  console.log(JSON.stringify(response.data));
-})
-.catch(function (error) {
-  console.log(error);
-});
+  axios(config)
+  .then(function (response) {
+    console.log(JSON.stringify(response.data));
+  })
+  .catch(function (error) {
+    console.log(error);
+  });
 
-} 
+}
 
 
 
@@ -120,67 +122,74 @@ axios(config)
 app.get("/", (req, res) => {
   res.send("Blockchain Api");
 });
+
 // UPDATE public.crypto_purchases SET balance = '20'::integer WHERE id = '1';
-function update(id, amount){
-  pool.query(`UPDATE public.crypto_purchases SET balance = '${id}'::integer WHERE id = '${amount}'`, (response) => {
+
+function update(id, amount) {
+  console.log(`Update Function ${id} ${amount}`)
+  pool.query(`UPDATE crypto_purchases SET balance = ${amount} WHERE id = ${id}`, (error, response) => {
+    if (error) {
+      console.log(error.message)
+    }
     console.log(response)
-  }).catch((error)=>{
-    console.log(error.message)
   })
 }
 
 
 app.get("/monitor", async (req, res) => {
   res.send("Working on it")
-  pool.query("SELECT id, weeyz_address, balance, payment_currency FROM public.crypto_purchases  WHERE (status = 0) ORDER BY id ASC", (error, response) => {
-    console.log(response.rows)
+  pool.query("SELECT id, weeyz_address, balance, payment_currency FROM crypto_purchases  WHERE (status = 0) ORDER BY id ASC", (error, response) => {
+    // console.log(response.rows)
     if (error) {
       console.log(error.message)
-    }
+    }z
     results = response.rows
     for (const result of results) {
-      address = result.weeyz_address
-      id = result.id
+     
+      var address = result.weeyz_address
+      var id = parseInt(result.id)
       // console.log(address)
-      if (result.weeyz_address == null) {
-        console.log("address is empty")
+      if (address != null) {
+        console.log(result)
+        if (result.weeyz_address == null) {
+          console.log("address is empty")
+        }
+        // If Network is ETH DO THIS
+        if (result.payment_currency == 2) {
+          // Get The Balance For Eth
+          console.log("For Eth")
+          getbalance(address, "eth").then(data_b => {
+            amount = data_b.balance/Math.pow(10, 18)
+            if (amount != 0) {
+              alertme(id, result.weeyz_address, "ETH", amount)
+              update(id, amount)
+            }
+            console.log(`Address: ${address} The Id: ${id}`)
+            update(id, amount)
+          }).catch((err) => {
+            console.log(err.message)
+          })
+          // If Network is BSC DO THIS
+        } else if (result.payment_currency == 3) {
+          // Get The Balance for BSC
+          getbalance(result.weeyz_address, "bsc").then(data_b => {
+            amount = data_b.balance/Math.pow(10, 18)
+            if (amount != 0) {
+              alertme(id, result.weeyz_address, "BSC", amount)
+              update(id, amount)
+            }
+            update(id, amount)
+
+          }).catch((err) => {
+            console.log(err.message)
+          })
+          //  If  Network is USDT DO THIS
+        } else if (result.payment_currency == 4) {
+          // Get Balance for USDT
+          getBalance(address, id);
+        }
+
       }
-      // If Network is ETH DO THIS
-      if (result.payment_currency == 2) {
-        // Get The Balance For Eth
-        console.log("For Eth")
-        getbalance(address, "eth").then(amount => {
-
-          if(result != 0){
-            alertme(result.weeyz_address, "ETH", amount)
-            update(id, amount)
-          }else{
-            update(id, amount)
-          }
-        }).catch((err) => {
-          console.log(err.message)
-        })
-        // If Network is BSC DO THIS
-      } else if (result.payment_currenct == 3) {
-        // Get The Balance for BSC
-        getbalance(result.weeyz_address, "bsc testnet").then(amount => {
-
-          if(result != 0){
-            alertme(result.weeyz_address, "BSC", amount)
-            update(id, amount)
-          }else{
-            update(id, amount)
-          }
-
-        }).catch((err) => {
-          console.log(err.message)
-        })
-        //  If  Network is USDT DO THIS
-      } else if (result.payment_currency == 4) {
-        // Get Balance for USDT
-        getBalance(address, id);
-      }
-
     }
   })
 });
